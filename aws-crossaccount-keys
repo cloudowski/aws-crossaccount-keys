@@ -1,0 +1,59 @@
+#!/bin/bash
+
+F=/tmp/aws_cred.txt
+C=$(mktemp)
+BOTO_CONFIG=$(mktemp)
+
+# I guess it must be unique
+SESSION_NAME="mysession$$"
+# The most important part
+ROLE_ARN="arn:aws:iam::123456789012:role/Account2RoleName"
+# Uncomment and provide ARN of MFA device if it's required by cross account role
+#MFA_ARN="PASTE_ARN_OF_MFA_DEVICE_HERE"
+# use for retrieveing temporary creds if other than default profile should be used
+AWSPROFILE="other_profile" 
+
+AWS_STS_OPTS=""
+
+if [ -n "$MFA_ARN" ];then
+  echo -n "Enter token code for device $MFA_ARN: "
+  read TOKEN
+  AWS_STS_OPTS="--serial-number '$MFA_ARN' --token-code $TOKEN"
+else
+  echo "MFA_ARN not provided - skipping token input"
+fi
+
+for bin in jq aws;do 
+  which $bin &> /dev/null || { echo "Binary $bin not found. Please install it first." >&2; exit 1; }
+done
+
+
+aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" "$AWS_STS_OPST" --profile "$AWSPROFILE" | tee $F
+
+# unset previous keys
+echo 'unset AWS_ACCESS_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SECRET_KEY AWS_SECURITY_TOKEN' > ${C}
+
+cat $F | jq -r '.Credentials|"export AWS_ACCESS_KEY=" + .AccessKeyId + "\nexport AWS_SECRET_KEY=" + .SecretAccessKey + "\nexport AWS_SECURITY_TOKEN=" + .SessionToken' >> ${C}
+# use new keys
+. ${C}
+echo "export AWS_SECRET_ACCESS_KEY='$AWS_SECRET_KEY'" >> ${C}
+echo "export AWS_ACCESS_KEY_ID='$AWS_ACCESS_KEY'" >> ${C}
+echo "export BOTO_CONFIG=$BOTO_CONFIG" >> ${C}
+
+# create temporary boto profile
+cat << EOF > $BOTO_CONFIG
+[Credentials]
+aws_access_key_id = $AWS_SECRET_KEY
+aws_secret_access_key = $AWS_ACCESS_KEY
+aws_security_token = $AWS_SECURITY_TOKEN
+
+EOF
+chmod 600 $BOTO_CONFIG $F
+
+echo "echo Boto config: $BOTO_CONFIG. Variables exported - now removing $C" >> $C
+echo "rm -f $C" >> $C
+
+rm -f ${F}
+
+echo -e "Please source $C to read AWS keys and boto configuration:\n\n. $C\n"
+
