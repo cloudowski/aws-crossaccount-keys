@@ -10,6 +10,13 @@ It is convenient in the following cases:
 
 # How can I use it?
 
-Just set variables at the beginning of the script (don't have time to make it more fancy). After you launch it you can source shell script that it generates (it will also delete itself for your security).
+Just set variables at the beginning of the script (don't have time to make it more fancy) and launch it:
 
-Enjoy!
+```
+./aws-crossaccount-keys
+
+``` 
+
+After you launch it you can source shell script that it generates (it will also delete itself for your security).
+
+**Enjoy!**
