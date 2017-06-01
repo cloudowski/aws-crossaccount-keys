@@ -14,7 +14,7 @@ then
     echo "Usage:"
     echo "   $scriptname dev"
     echo "dev - for dev account"
-    echo "bapp - for aks account"
+    echo "bapp - for business apps account"
     echo "ssrvc - for shared services account"
     echo "mgmt - for management account"
     echo ""
