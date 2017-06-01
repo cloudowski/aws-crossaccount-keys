@@ -1,5 +1,38 @@
 #!/bin/bash
 
+scriptname=`basename $0`
+cfg=".aws/cross-account-roles"
+# provide ARN  of MFA device if it's required by cross account role in this file and  OTP KEY Name used by oauthtool
+mfa="$HOME/.aws/mfa"
+# source file with MFA variables
+source $mfa
+
+if [ -z $1 ]
+then
+    echo "$scriptname: Service Name Req'd"
+    echo ""
+    echo "Usage:"
+    echo "   $scriptname dev"
+    echo "dev - for dev account"
+    echo "bapp - for business apps account"
+    echo "ssrvc - for shared services account"
+    echo "mgmt - for management account"
+    echo ""
+    echo "Configuration: $HOME/$cfg"
+    echo "Format: name=aws-cross-account-role|aws-profile"
+    exit
+fi
+
+awsrole=` grep ^$1 $HOME/$cfg | cut -d"=" -f 2 | cut -d"|" -f 1 | sed "s/ //g" `
+awsprofile=` grep ^$1 $HOME/$cfg | cut -d"=" -f 2 | cut -d"|" -f 2 | sed "s/ //g" `
+
+if [ -z "$awsrole" ] || [ -z "$awsprofile" ]
+then
+    echo "$scriptname: Bad Service Name"
+    exit
+fi
+
+
 F=/tmp/aws_cred.txt
 C=$(mktemp)
 BOTO_CONFIG=$(mktemp)
@@ -7,28 +40,28 @@ BOTO_CONFIG=$(mktemp)
 # I guess it must be unique
 SESSION_NAME="mysession$$"
 # The most important part
-ROLE_ARN="arn:aws:iam::123456789012:role/Account2RoleName"
-# Uncomment and provide ARN of MFA device if it's required by cross account role
-#MFA_ARN="PASTE_ARN_OF_MFA_DEVICE_HERE"
+ROLE_ARN="$awsrole"
 # use for retrieveing temporary creds if other than default profile should be used
-AWSPROFILE="other_profile" 
+AWSPROFILE="$awsprofile" 
 
-AWS_STS_OPTS=""
 
-if [ -n "$MFA_ARN" ];then
-  echo -n "Enter token code for device $MFA_ARN: "
-  read TOKEN
-  AWS_STS_OPTS="--serial-number '$MFA_ARN' --token-code $TOKEN"
-else
-  echo "MFA_ARN not provided - skipping token input"
-fi
-
-for bin in jq aws;do 
+for bin in jq aws oathtool;do 
   which $bin &> /dev/null || { echo "Binary $bin not found. Please install it first." >&2; exit 1; }
 done
 
-
-aws sts assume-role --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" "$AWS_STS_OPST" --profile "$AWSPROFILE" | tee $F
+# 2FA token 
+otpkey=` grep ^$MFA $HOME/.otpkeys | cut -d"=" -f 2 | sed "s/ //g" `
+if [ -z $otpkey ]
+then
+    echo "$scriptname: Bad Service Name"
+    exit
+fi
+TOKEN=`/usr/bin/oathtool --totp -b "$otpkey"`
+if [ -n "$MFA_ARN" ];then
+  aws sts assume-role  --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" --serial-number $MFA_ARN --token-code $TOKEN  | tee $F
+else
+  aws sts assume-role  --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" --profile "$AWSPROFILE" | tee $F
+fi
 
 # unset previous keys
 echo 'unset AWS_ACCESS_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SECRET_KEY AWS_SECURITY_TOKEN' > ${C}
@@ -55,5 +88,15 @@ echo "rm -f $C" >> $C
 
 rm -f ${F}
 
-echo -e "Please source $C to read AWS keys and boto configuration:\n\n. $C\n"
 
+# sourcing file with new aws credentials
+source $C
+
+echo ""
+accountalias=`aws iam list-account-aliases --output text`
+accountnumber=`aws sts get-caller-identity --output text --query 'Account'`
+echo -e "Your switched to the following aws account:"
+echo -e "$accountalias"
+echo -e "$accountnumber"
+echo ""
+echo "By default your creds are valid for one hour, after that you need to rerun script"
