@@ -2,8 +2,10 @@
 
 scriptname=`basename $0`
 cfg=".aws/cross-account-roles"
-# provide ARN  of MFA device if it's required by cross account role in this file
-mfa=".aws/mfa"
+# provide ARN  of MFA device if it's required by cross account role in this file and  OTP KEY Name used by oauthtool
+mfa="$HOME/.aws/mfa"
+# source file with MFA variables
+source $mfa
 
 if [ -z $1 ]
 then
@@ -47,8 +49,14 @@ for bin in jq aws oathtool;do
   which $bin &> /dev/null || { echo "Binary $bin not found. Please install it first." >&2; exit 1; }
 done
 
-
-TOKEN=`~/bin/otp gipfaws`
+# 2FA token 
+otpkey=` grep ^$MFA $HOME/.otpkeys | cut -d"=" -f 2 | sed "s/ //g" `
+if [ -z $otpkey ]
+then
+    echo "$scriptname: Bad Service Name"
+    exit
+fi
+TOKEN=`/usr/bin/oathtool --totp -b "$otpkey"`
 if [ -n "$MFA_ARN" ];then
   aws sts assume-role  --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" --serial-number $MFA_ARN --token-code $TOKEN  | tee $F
 else
@@ -90,3 +98,5 @@ accountnumber=`aws sts get-caller-identity --output text --query 'Account'`
 echo -e "Your switched to the following aws account:"
 echo -e "$accountalias"
 echo -e "$accountnumber"
+echo ""
+echo "By default your creds are valid for one hour, after that you need to rerun script"
