@@ -1,5 +1,5 @@
 # What is it?
-It's a improved version of simple shell script forked from cloudowski that is used by me to enable easy access to other AWS accounts using STS and cross account roles as well as MFA
+It's a simple shell script used enable easy access to other AWS accounts using STS and cross account roles as well as MFA
 
 # Why would I need it?
 It is convenient in the following cases:
@@ -23,7 +23,6 @@ To switch to development account just use argument which is mapped in .aws/cross
 
 ```
 
-New aws keys are automatically exported in a current shell
+New aws keys are automatically exported to a current shell
 
-**Many thanks for Cloudowski who provided the first version!**
 **Enjoy!**
