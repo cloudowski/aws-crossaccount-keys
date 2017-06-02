@@ -72,8 +72,8 @@ cat $F | jq -r '.Credentials|"export AWS_ACCESS_KEY=" + .AccessKeyId + "\nexport
 echo "export AWS_SECRET_ACCESS_KEY='$AWS_SECRET_KEY'" >> ${C}
 echo "export AWS_ACCESS_KEY_ID='$AWS_ACCESS_KEY'" >> ${C}
 echo "export BOTO_CONFIG=$BOTO_CONFIG" >> ${C}
-echo "aws iam list-account-aliases --output text >> ${C}
-echo "aws sts get-caller-identity --output text --query 'Account' >> ${C}
+echo "aws iam list-account-aliases --output text" >> ${C}
+echo "aws sts get-caller-identity --output text --query 'Account'" >> ${C}
 
 # create temporary boto profile
 cat << EOF > $BOTO_CONFIG
