@@ -32,6 +32,7 @@ then
     exit
 fi
 
+unset AWS_SESSION_TOKEN AWS_ACCESS_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SECRET_KEY AWS_SECURITY_TOKEN
 
 F=/tmp/aws_cred.txt
 C=$(mktemp)
@@ -64,9 +65,9 @@ else
 fi
 
 # unset previous keys
-echo 'unset AWS_ACCESS_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SECRET_KEY AWS_SECURITY_TOKEN' > ${C}
+echo 'unset AWS_SESSION_TOKEN AWS_ACCESS_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SECRET_KEY AWS_SECURITY_TOKEN' > ${C}
 
-cat $F | jq -r '.Credentials|"export AWS_ACCESS_KEY=" + .AccessKeyId + "\nexport AWS_SECRET_KEY=" + .SecretAccessKey + "\nexport AWS_SECURITY_TOKEN=" + .SessionToken' >> ${C}
+cat $F | jq -r '.Credentials|"export AWS_ACCESS_KEY=" + .AccessKeyId + "\nexport AWS_SECRET_KEY=" + .SecretAccessKey + "\nexport AWS_SECURITY_TOKEN=" + .SessionToken + "\nexport AWS_SESSION_TOKEN=" + .SessionToken' >> ${C}
 # use new keys
 . ${C}
 echo "export AWS_SECRET_ACCESS_KEY='$AWS_SECRET_KEY'" >> ${C}
@@ -81,6 +82,7 @@ cat << EOF > $BOTO_CONFIG
 aws_access_key_id = $AWS_SECRET_KEY
 aws_secret_access_key = $AWS_ACCESS_KEY
 aws_security_token = $AWS_SECURITY_TOKEN
+aws_session_token = $AWS_SECURITY_TOKEN
 
 EOF
 chmod 600 $BOTO_CONFIG $F
