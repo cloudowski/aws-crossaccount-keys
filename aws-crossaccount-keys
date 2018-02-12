@@ -57,7 +57,7 @@ then
     echo "$scriptname: Bad Service Name"
     exit
 fi
-TOKEN=`/usr/bin/oathtool --totp -b "$otpkey"`
+TOKEN=`oathtool --totp -b "$otpkey"`
 if [ -n "$MFA_ARN" ];then
   aws sts assume-role  --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" --serial-number $MFA_ARN --token-code $TOKEN  | tee $F
 else
