@@ -7,6 +7,14 @@ mfa="$HOME/.aws/mfa"
 # source file with MFA variables
 source $mfa
 
+TIME=$(date +'%Y-%m-%d-%H-%M-%S')
+
+AWS_CONF="$HOME/.aws/config"
+AWS_CREDS="$HOME/.aws/credentials"
+
+# default profile for making cross-accounts
+MAIN=main
+
 if [ -z $1 ]
 then
     echo "$scriptname: Service Name Req'd"
@@ -32,6 +40,16 @@ then
     exit
 fi
 
+# restore default profile from backupf if it exists
+if [ -f $AWS_CONF.bak ]; then
+  # backing up the old profile with default creds
+  cp -p  $AWS_CONF.bak $AWS_CONF
+fi
+
+if [  -f $AWS_CREDS.bak ]; then
+  cp -p  $AWS_CREDS.bak $AWS_CREDS
+fi
+
 unset AWS_SESSION_TOKEN AWS_ACCESS_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SECRET_KEY AWS_SECURITY_TOKEN
 
 F=/tmp/aws_cred.txt
@@ -43,14 +61,14 @@ SESSION_NAME="mysession$$"
 # The most important part
 ROLE_ARN="$awsrole"
 # use for retrieveing temporary creds if other than default profile should be used
-AWSPROFILE="$awsprofile" 
+AWSPROFILE="$awsprofile"
 
 
-for bin in jq aws oathtool;do 
+for bin in jq aws oathtool;do
   which $bin &> /dev/null || { echo "Binary $bin not found. Please install it first." >&2; exit 1; }
 done
 
-# 2FA token 
+# 2FA token
 otpkey=` grep ^$MFA $HOME/.otpkeys | cut -d"=" -f 2 | sed "s/ //g" `
 if [ -z $otpkey ]
 then
@@ -58,7 +76,7 @@ then
     exit
 fi
 TOKEN=`oathtool --totp -b "$otpkey"`
-if [ -n "$MFA_ARN" ];then
+if [ -n "$MFA_ARN" ]; then
   aws sts assume-role  --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" --serial-number $MFA_ARN --token-code $TOKEN  | tee $F
 else
   aws sts assume-role  --role-arn "$ROLE_ARN" --role-session-name "$SESSION_NAME" --profile "$AWSPROFILE" | tee $F
@@ -78,19 +96,43 @@ echo "aws sts get-caller-identity --output text --query 'Account'" >> ${C}
 
 # create temporary boto profile
 cat << EOF > $BOTO_CONFIG
-[Credentials]
-aws_access_key_id = $AWS_SECRET_KEY
-aws_secret_access_key = $AWS_ACCESS_KEY
+[default]
+aws_access_key_id = $AWS_ACCESS_KEY
+aws_secret_access_key = $AWS_SECRET_KEY
 aws_security_token = $AWS_SECURITY_TOKEN
 aws_session_token = $AWS_SECURITY_TOKEN
 
 EOF
 chmod 600 $BOTO_CONFIG $F
 
+# use sts creds as default profile
+if [ ! -f $AWS_CONF.bak ]; then
+  # backing up the old profile with default creds
+  cp -p $AWS_CONF $AWS_CONF.bak
+fi
+
+if [ ! -f $AWS_CREDS.bak ]; then
+  cp -p $AWS_CREDS $AWS_CREDS.bak
+fi
+
+cp -p $AWS_CONF $AWS_CONF.$TIME
+cp -p $AWS_CREDS $AWS_CREDS.$TIME
+
+
+cp -p $BOTO_CONFIG $AWS_CREDS
+
+cat $AWS_CREDS.bak | grep -A2 -E '^\[ssrvc-terraform-backend' >> $AWS_CREDS
+cat $AWS_CONF.bak  | grep -A1 -E '^\[ssrvc-terraform-backend' >> $AWS_CONF
+
+cat $AWS_CREDS.bak | grep -A2 -E '^\[default' | sed 's/default/main/' >> $AWS_CREDS
+cat $AWS_CONF.bak | grep -A1 -E '^\[default' | sed 's/default/main/' >> $AWS_CONF
+
+unset AWS_SESSION_TOKEN AWS_ACCESS_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SECRET_KEY AWS_SECURITY_TOKEN
+
 echo "echo Boto config: $BOTO_CONFIG. Variables exported - now removing $C" >> $C
 echo "rm -f $C" >> $C
 
-rm -f ${F}
+rm -f ${F} ${C}
 
 # there is now easy way to share variables from child process to parent
 # it's possible somehow with trap and kill but it's some kind of magic
@@ -98,6 +140,7 @@ rm -f ${F}
 # sourcing file with new aws credentials
 #trap 'echo "sourcing aws creds file"; source "$C"' INT
 
-echo ""
-echo -e "Please source $C to read AWS keys and boto configuration:\n\n. $C\n"
-echo "By default your creds are valid for one hour, after that you need to rerun script"
+# we no longer exporting env variables, instead we are using .aws/config and credentials
+#echo ""
+#echo -e "Please source $C to read AWS keys and boto configuration:\n\n. $C\n"
+#echo "By default your creds are valid for one hour, after that you need to rerun script"

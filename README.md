@@ -6,7 +6,7 @@ It is convenient in the following cases:
 
   * Your application is not compatible with boto profiles (like **Ansible**)
   * Your cross account role requires MFA tokens
-  * For some other reasons you need pure AWS keys instead of boto profile
+  * To support Terraform s3-dynamodb state backends
 
 # How can I use it?
 
@@ -23,7 +23,8 @@ To switch to development account just use argument which is mapped in .aws/cross
 
 ```
 
-New aws keys are automatically exported in a current shell
+New aws keys are set as a default profile in ~/.aws/credential ~/.aws/config
+Previous default profile is renamed as [main], so you can still use it, by explicitly reference to [main]
 
 **Many thanks for Cloudowski who provided the first version!**
 **Enjoy!**
