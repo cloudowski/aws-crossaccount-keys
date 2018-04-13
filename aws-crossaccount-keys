@@ -57,7 +57,7 @@ C=$(mktemp)
 BOTO_CONFIG=$(mktemp)
 
 # I guess it must be unique
-SESSION_NAME="mysession$$"
+SESSION_NAME="$USER.$UID"
 # The most important part
 ROLE_ARN="$awsrole"
 # use for retrieveing temporary creds if other than default profile should be used
